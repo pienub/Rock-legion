@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rock Legion</title>
+
+<style>
+body {
+    margin:0;
+    font-family:Arial;
+    background:#0b0b0b;
+    color:white;
+}
+
+/* LOGIN */
+#login {
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+}
+
+/* CHAT */
+#chat {
+    display:none;
+    height: calc(100vh - 140px);
+    overflow-y:auto;
+    padding:10px;
+}
+
+.msg {
+    background:#1f1f1f;
+    margin:8px 0;
+    padding:10px;
+    border-radius:10px;
+}
+
+.system {
+    text-align:center;
+    color:gray;
+    font-size:12px;
+}
+
+.reply {
+    font-size:12px;
+    color:#aaa;
+    border-left:3px solid #555;
+    padding-left:6px;
+    margin-bottom:5px;
+}
+
+/* BAR */
+#bar {
+    position:fixed;
+    bottom:0;
+    width:100%;
+    display:flex;
+    gap:5px;
+    padding:8px;
+    background:#111;
+    box-sizing:border-box;
+}
+
+input, button {
+    padding:10px;
+    border:none;
+    border-radius:8px;
+}
+
+input { flex:1; }
+
+button {
+    background:#2d6bff;
+    color:white;
+}
+
+img {
+    max-width:200px;
+    border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+    <h2>Rock Legion</h2>
+    <input id="name" placeholder="Enter username">
+</div>
+
+<!-- CHAT -->
+<div id="chat"></div>
+
+<div id="bar">
+    <input id="msg" placeholder="Message">
+    <button onclick="send()">Send</button>
+
+    <input type="file" id="img">
+    <button onclick="sendImage()">📷</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const chat = document.getElementById("chat");
+
+let replyTarget = null;
+
+// 👤 ENTER NAME → ENTER KEY TO JOIN
+document.getElementById("name").addEventListener("keypress", e => {
+    if (e.key === "Enter") {
+        const name = document.getElementById("name").value.trim();
+
+        socket.emit("setName", name, (res) => {
+            if (!res.ok) return alert("Enter a valid name");
+
+            document.getElementById("login").style.display = "none";
+            document.getElementById("chat").style.display = "block";
+        });
+    }
+});
+
+// ⌨ ENTER TO SEND MESSAGE
+document.getElementById("msg").addEventListener("keypress", e => {
+    if (e.key === "Enter") send();
+});
+
+// 💬 SEND MESSAGE
+function send(){
+    const msg = document.getElementById("msg").value;
+    if(!msg) return;
+
+    socket.emit("message", {
+        text: msg,
+        replyTo: replyTarget
+    });
+
+    document.getElementById("msg").value = "";
+}
+
+// 📜 AUTO SCROLL
+function scroll(){
+    chat.scrollTop = chat.scrollHeight;
+}
+
+// 💬 MESSAGE DISPLAY
+socket.on("message", d => {
+    const div = document.createElement("div");
+    div.className = "msg";
+
+    div.innerHTML = `<b>${d.name}:</b><br>${d.text}`;
+    chat.appendChild(div);
+
+    scroll();
+});
+
+// 🟡 SYSTEM MESSAGE
+socket.on("system", m => {
+    const div = document.createElement("div");
+    div.className = "system";
+    div.innerText = m;
+
+    chat.appendChild(div);
+    scroll();
+});
+
+// 🖼 IMAGE
+socket.on("image", d => {
+    const div = document.createElement("div");
+    div.className = "msg";
+    div.innerHTML = `<b>${d.name}</b><br><img src="${d.url}">`;
+
+    chat.appendChild(div);
+    scroll();
+});
+
+// 📷 UPLOAD IMAGE
+function sendImage(){
+    const file = document.getElementById("img").files[0];
+    if(!file) return;
+
+    const fd = new FormData();
+    fd.append("image", file);
+
+    fetch("/upload", {
+        method: "POST",
+        body: fd
+    });
+}
+</script>
+
+</body>
+</html>
